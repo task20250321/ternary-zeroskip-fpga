@@ -1,0 +1,31 @@
+# ============================================================
+# DE25-Standard DDR4 placement probe
+#
+# Only three anchor pins are fixed.
+# All DQ/DQS/AC/CK pins are temporarily placed by Fitter.
+# This file is for diagnosis only and is not usable on hardware.
+# ============================================================
+
+# DDR4 150 MHz PHY reference clock
+set_instance_assignment -name IO_STANDARD \
+    "1.2-V TRUE DIFFERENTIAL SIGNALING" \
+    -to DDR4_REFCLK_p
+
+set_location_assignment PIN_AB117 \
+    -to DDR4_REFCLK_p
+
+# DDR4 memory reset
+set_instance_assignment -name IO_STANDARD \
+    "SSTL-12" \
+    -to DDR4_RESET_n
+
+set_location_assignment PIN_H117 \
+    -to DDR4_RESET_n
+
+# DDR4 OCT calibration resistor
+set_instance_assignment -name IO_STANDARD \
+    "1.2-V" \
+    -to DDR4_RZQ
+
+set_location_assignment PIN_AK111 \
+    -to DDR4_RZQ

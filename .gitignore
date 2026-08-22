@@ -1,0 +1,74 @@
+# OS / editors
+.DS_Store
+.vscode/
+.idea/
+*~
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# Model / generated evaluation data
+sim/prepared_cases/
+*.npy
+*.npz
+*.safetensors
+*.pt
+*.pth
+
+# Synopsys VCS
+sim/build/
+**/vcs_build*/
+**/simv
+**/simv.daidir/
+**/csrc/
+csrc/
+ucli.key
+*.vcd
+*.vpd
+*.fsdb
+*.fst
+
+# Quartus generated products
+db/
+dni/
+incremental_db/
+output_files/
+qdb/
+*.qws
+*.smsg
+*.sof
+*.pof
+*.jic
+*.rbf
+
+# Generated IP products
+ip/**/synth/
+ip/**/sim/
+ip/**/simulation/
+ip/**/qdb/
+ip/**/*.qip
+ip/**/*.xml
+
+# Generated evaluation artifacts
+paper_eval/**/vcd/
+paper_eval/**/power/
+paper_eval/**/build/
+paper_eval/**/builds/
+paper_eval/**/backup/
+
+# Development backups
+*.before_*
+*.bak
+*.bak.*
+
+# Local public-release audit files
+public_inventory.txt
+/top/zeroskip_active_case.svh
+
+# Disposable reproducibility builds
+/build/

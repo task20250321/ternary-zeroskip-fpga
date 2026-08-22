@@ -1,0 +1,3 @@
+architecture,num_pe,in_features,out_features,alms,alm_capacity,alm_pct,registers,block_memory_bits,ram_blocks,ram_capacity,dsp_blocks,fmax_mhz,setup_slack_ns
+zeroskip_pe_owned,128,6912,2560,35597,46800,76.06,32250,217408,159,358,0,107.16,10.668
+dense_pe_owned,128,6912,2560,29333,46800,62.68,30762,217408,159,358,0,98.67,9.865
