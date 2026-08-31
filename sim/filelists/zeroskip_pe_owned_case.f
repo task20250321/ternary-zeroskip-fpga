@@ -1,0 +1,12 @@
+rtl/memory/rv_fifo.sv
+rtl/lut/trit5_decode_lut.sv
+rtl/memory/pending_sum_bank.sv
+rtl/memory/activation_buffer_ram.sv
+rtl/memory/activation_prefetch_stream.sv
+rtl/core/pe_owned_word_dispatcher.sv
+rtl/core/pe_owned_key_engine.sv
+rtl/core/pe_owned_private_accumulator.sv
+rtl/core/ternary_zeroskip_pe_owned_accelerator.sv
+rtl/memory/emif_weight_stream_to_rv.sv
+rtl/core/ternary_zeroskip_pe_owned_emif_wrapper.sv
+sim/tb/tb_zeroskip_pe_owned_case.sv

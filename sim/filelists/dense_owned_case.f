@@ -1,0 +1,14 @@
++incdir+top
+rtl/memory/rv_fifo.sv
+rtl/lut/trit5_decode_lut.sv
+rtl/baseline/trit5_dense_decode_lut.sv
+rtl/memory/pending_sum_bank.sv
+rtl/memory/activation_buffer_ram.sv
+rtl/memory/activation_prefetch_stream.sv
+rtl/baseline/dense_owned_word_dispatcher.sv
+rtl/baseline/dense_owned_key_engine.sv
+rtl/baseline/dense_owned_private_accumulator.sv
+rtl/baseline/ternary_dense_owned_accelerator.sv
+rtl/memory/emif_weight_stream_to_rv.sv
+rtl/baseline/ternary_dense_owned_emif_wrapper.sv
+sim/tb/tb_dense_owned_case.sv

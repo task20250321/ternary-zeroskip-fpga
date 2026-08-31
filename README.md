@@ -158,6 +158,88 @@ Absolute power estimates were reported by Quartus with low confidence,
 so they should primarily be interpreted as matched relative
 comparisons between architectures.
 
+## VCS Functional Simulation
+
+A small synthetic regression case is included to verify the arithmetic
+and data mapping of the PE-owned zero-skip accelerator without requiring
+the original BitNet checkpoint.
+
+### Requirements
+
+- Synopsys VCS
+- Bash
+- Python 3
+- NumPy
+
+Synopsys VCS is commercial software and is not included in this repository.
+
+### Reference Test
+
+The included reference case uses:
+
+- 128 valid input elements
+- 128 valid output elements
+- input values `0, 1, ..., 127`
+- ternary weights in `{ -1, 0, +1 }`
+- contiguous offline output-group ownership
+- zero padding outside the valid output range
+
+The weight patterns include all-zero, all-+1, all--1, alternating
+zero/+1, +1/zero, zero/-1, -1/zero, +1/-1, and -1/+1 patterns.
+
+Representative expected outputs are:
+
+```text
+0
+8128
+-8128
+4096
+4032
+-4096
+-4032
+-64
+64
+```
+
+### Zero-Skip Accelerator
+
+Run:
+
+```bash
+./sim/scripts/run_pe_owned_case_vcs.sh \
+  sim/reference_cases/corner128x128_contiguous_pe32
+```
+
+The simulation is successful when `vcs_run_report.txt` contains:
+
+```text
+mismatches=0
+```
+
+### Canonical Output Verification
+
+The accelerator emits outputs in physical ownership order. Reorder them
+to canonical output order and compare against the software reference:
+
+```bash
+python3 tools/vcs/verify_pe_owned_mapping_output.py \
+  sim/reference_cases/corner128x128_contiguous_pe32
+```
+
+### Dense Baseline
+
+The structurally matched dense PE-owned baseline can be simulated with:
+
+```bash
+./sim/scripts/run_dense_owned_case_vcs.sh \
+  sim/reference_cases/corner128x128_contiguous_pe32
+```
+
+### Generated Files
+
+VCS-generated executables, build directories, simulation results, and
+waveform files are intentionally excluded from Git.
+
 ## License
 
 A license will be added according to the applicable

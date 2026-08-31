@@ -72,3 +72,32 @@ public_inventory.txt
 
 # Disposable reproducibility builds
 /build/
+
+# ============================================================
+# Synopsys VCS generated artifacts
+# ============================================================
+simv
+simv.daidir/
+csrc/
+AN.DB/
+ucli.key
+DVEfiles/
+.vcs.timestamp
+
+*.vpd
+*.fsdb
+
+# Native VCS build products
+*.o
+*.so
+
+# Per-case generated simulation results
+vcs_build*/
+vcs_results/
+
+# Large/generated experiment cases
+sim/prepared_cases/
+
+# Python generated files
+__pycache__/
+*.py[cod]

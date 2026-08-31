@@ -1,0 +1,11 @@
+tensor=synthetic_corner_128x128
+shape=[320, 128] PE=32
+mapping=contiguous
+dense_products=40960
+nonzero_products=10880
+dense_ideal_mac_cycles=1280
+global_ideal_zero_skip_cycles=340
+ownership_ideal_cycles=896
+pe_owner_max_to_mean=2.635294118
+weight_requests=256
+weight_traffic_ratio_vs_source=NA
