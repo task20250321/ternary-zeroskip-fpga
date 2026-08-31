@@ -290,6 +290,23 @@ def main() -> None:
                 b = bytes(int(x) for x in words[i, w])
                 f.write(b[::-1].hex().upper() + "\n")
 
+    # System Console/JTAG uses 32-bit Avalon-MM writes.
+    # Eight consecutive 32-bit words reconstruct exactly one
+    # 256-bit weight word in the FPGA host endpoint.
+    with (case_dir / "weight_words32.txt").open("w", encoding="ascii") as f:
+        for i in range(in_f):
+            for w in range(words_per_input):
+                b = bytes(int(x) for x in words[i, w])
+
+                for lane32 in range(8):
+                    chunk = b[4*lane32 : 4*(lane32+1)]
+                    value = int.from_bytes(
+                        chunk,
+                        byteorder="little",
+                        signed=False,
+                    )
+                    f.write(f"{value:08X}\n")
+
     write_activation_words(case_dir / "activation_words32.txt", activations)
     write_expected_mem(
         case_dir / "expected_outputs.mem", expected_physical, acc_width
@@ -408,7 +425,8 @@ def main() -> None:
     (case_dir / "theoretical_reference.txt").write_text(theoretical, encoding="utf-8")
 
     manifest = [
-        "weight_stream.mem", "activation_words32.txt", "expected_outputs.mem",
+        "weight_stream.mem", "weight_words32.txt",
+        "activation_words32.txt", "expected_outputs.mem",
         "expected_outputs_canonical.mem", "expected_outputs.txt",
         "expected_outputs_canonical.txt", "case_metadata.json",
         "zeroskip_active_case.svh", "pe_ownership_workload.csv",
