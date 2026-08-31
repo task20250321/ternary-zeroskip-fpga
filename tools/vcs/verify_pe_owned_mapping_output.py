@@ -29,7 +29,38 @@ def main() -> None:
     with perm_path.open() as f:
         rows = list(csv.DictReader(f))
     perm = np.asarray([int(r["global_output"]) for r in rows], dtype=np.int64)
-    ref = np.load(ref_path).astype(np.int64).reshape(-1)
+    if ref_path.exists():
+        ref = np.load(ref_path).astype(np.int64).reshape(-1)
+    else:
+        ref_txt_path = ref_path.with_suffix(".txt")
+
+        if not ref_txt_path.exists():
+            raise FileNotFoundError(
+                f"missing canonical reference: "
+                f"{ref_path} or {ref_txt_path}"
+            )
+
+        values = []
+
+        for line in ref_txt_path.read_text().splitlines():
+            line = line.strip()
+
+            if not line:
+                continue
+
+            # Supports both:
+            #   value
+            # and:
+            #   index<TAB>value
+            token = line.split()[-1]
+
+            try:
+                values.append(int(token, 0))
+            except ValueError:
+                # Allows an optional text header.
+                continue
+
+        ref = np.asarray(values, dtype=np.int64).reshape(-1)
 
     if len(physical) != len(perm):
         raise RuntimeError(f"outputs={len(physical)} permutation={len(perm)}")
