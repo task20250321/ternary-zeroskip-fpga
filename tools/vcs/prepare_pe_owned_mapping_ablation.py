@@ -4,30 +4,24 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
-import importlib.util
 import json
 import math
 from pathlib import Path
-import sys
 
 import numpy as np
+
+from pe_owned_case_common import (
+    low_switch_lookup,
+    pattern_tuple,
+    trits5_to_pattern_id,
+    write_activation_words,
+    write_expected_mem,
+)
 
 ACT_WIDTH = 8
 SUPPORTED_NUM_PE = (32, 64, 128)
 SUPPORTED_MAPPING = ("block_cyclic", "contiguous")
 
-
-def load_base_tool(project: Path):
-    path = project / "paper_eval/tools/pe_owned/prepare_pe_owned_case.py"
-    if not path.exists():
-        raise FileNotFoundError(f"missing base PE-owned case tool: {path}")
-    spec = importlib.util.spec_from_file_location("pe_owned_base", path)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"cannot import {path}")
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = mod
-    spec.loader.exec_module(mod)
-    return mod
 
 
 def sha256(path: Path) -> str:
@@ -80,7 +74,6 @@ def main() -> None:
     if not source.exists():
         raise FileNotFoundError(source)
 
-    base_tool = load_base_tool(project)
 
     meta_path = source / "case_metadata.json"
     meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
@@ -117,8 +110,8 @@ def main() -> None:
     by_input = padded_weights.T.reshape(
         in_f, total_groups, 5
     )
-    pids = base_tool.trits5_to_pattern_id(by_input)
-    lut = base_tool.low_switch_lookup()
+    pids = trits5_to_pattern_id(by_input)
+    lut = low_switch_lookup()
     canonical_keys = lut[pids]  # [input, global_group]
 
     owned = owner_lists(
@@ -203,7 +196,7 @@ def main() -> None:
     for pid, key in enumerate(lut):
         inv[int(key)] = pid
     patterns = np.asarray(
-        [base_tool.pattern_tuple(pid) for pid in range(243)], dtype=np.int8
+        [pattern_tuple(pid) for pid in range(243)], dtype=np.int8
     )
     for w in range(words_per_input):
         block = w % blocks_per_local_group
@@ -297,11 +290,11 @@ def main() -> None:
                 b = bytes(int(x) for x in words[i, w])
                 f.write(b[::-1].hex().upper() + "\n")
 
-    base_tool.write_activation_words(case_dir / "activation_words32.txt", activations)
-    base_tool.write_expected_mem(
+    write_activation_words(case_dir / "activation_words32.txt", activations)
+    write_expected_mem(
         case_dir / "expected_outputs.mem", expected_physical, acc_width
     )
-    base_tool.write_expected_mem(
+    write_expected_mem(
         case_dir / "expected_outputs_canonical.mem", expected_canonical, acc_width
     )
     (case_dir / "expected_outputs.txt").write_text(
