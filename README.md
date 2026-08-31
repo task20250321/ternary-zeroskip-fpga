@@ -168,7 +168,7 @@ the original BitNet checkpoint.
 
 - Synopsys VCS
 - Bash
-- Python 3
+- Python 3.8 or later
 - NumPy
 
 Synopsys VCS is commercial software and is not included in this repository.
@@ -219,7 +219,10 @@ mismatches=0
 ### Canonical Output Verification
 
 The accelerator emits outputs in physical ownership order. Reorder them
-to canonical output order and compare against the software reference:
+to canonical output order and compare against the software reference.
+
+This verification step requires a modern Python environment and may be
+run separately from the VCS simulation environment:
 
 ```bash
 python3 tools/vcs/verify_pe_owned_mapping_output.py \

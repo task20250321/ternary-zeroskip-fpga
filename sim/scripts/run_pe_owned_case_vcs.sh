@@ -25,6 +25,10 @@ vcs \
   -Mdir="${BUILD}/csrc" \
   -l "${BUILD}/compile.log"
 
+
+# TB writes one decimal output file per physical bank.
+mkdir -p "${CASE_DIR}/vcs_results/banks"
+
 "${BUILD}/simv" \
   "+CASE_DIR=${CASE_DIR}" \
   -l "${CASE_DIR}/vcs_results/run_pe_owned.log"
