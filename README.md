@@ -1,326 +1,340 @@
-# PE-Owned Ternary Zero-Skip FPGA Accelerator
+# Fine-Grained Zero Skipping for Ternary LLM Linear Layers with Packed Sparse Metadata
 
-FPGA implementation and reproducibility utilities for a PE-owned zero-skipping accelerator targeting ternary-weight linear layers.
+FPGA RTL and reproducibility utilities for the architecture described in:
 
-The design processes weights in \(\{-1,0,+1\}\), stores five ternary weights in one 8-bit key, decodes the key on chip, and skips zero-valued products. The final architecture assigns output groups statically to processing elements (PEs), eliminating the global partial-product router used in earlier prototypes.
+**Yu Inoue, Takao Marukame, Tetsuya Asai, and Kota Ando,  
+“Fine-Grained Zero Skipping for Ternary LLM Linear Layers with Packed Sparse Metadata.”**
 
-A structurally matched dense PE-owned baseline is included for comparison.
+This repository implements a fine-grained zero-skipping accelerator for ternary-weight linear layers. Five ternary weights in `{-1, 0, +1}` are stored as one fixed-length 8-bit key. At runtime, the key is decoded directly into the **signs, number, and coordinates of only the nonzero weights**, so zero-valued positions do not become product-issue events.
 
----
+The final FPGA architecture statically assigns five-output groups to processing elements (PEs) and accumulates their contributions in PE-local partial-sum memories. This removes the inter-PE sparse-product router required by the earlier prototypes while preserving the same packed-key zero-skipping mechanism. A structurally matched dense PE-owned baseline is included for comparison.
 
-## 1. Repository Status
+## Key Idea
 
-This repository is currently being prepared for public release.
+### Fixed-length five-trit packing
 
-The following flows are included:
-
-- clean Quartus reconstruction of the final zero-skip design;
-- clean Quartus reconstruction of the matched dense baseline;
-- configurable FPGA builds for user-specified linear-layer shapes;
-- Synopsys VCS functional simulation;
-- a self-contained synthetic regression case;
-- preparation of PE-owned cases from official BitNet packed weights;
-- preparation of PE-owned cases from arbitrary ternary NumPy weight matrices;
-- physical-to-canonical output verification.
-
-The FPGA board execution flow is **not yet part of the validated release flow**. Programming the generated SOF, loading weights/activations through JTAG/Avalon-MM, starting the accelerator, and reading results back from hardware will be documented after board-level validation.
-
-A final software license has also not yet been added.
-
----
-
-## 2. Architecture Overview
-
-The target operation is a ternary-weight linear layer
+Five ternary weights have 243 possible patterns:
 
 \[
-y_o = \sum_{i=0}^{N_{\mathrm{in}}-1} W_{o,i} x_i,
-\qquad
-W_{o,i} \in \{-1,0,+1\}.
+3^5 = 243.
 \]
 
-### 2.1 Five-trit packing
+An 8-bit key is therefore the minimum lossless fixed-length representation because
 
-Five ternary weights are encoded into one fixed-length 8-bit key:
+\[
+2^7 < 3^5 \leq 2^8,
+\]
+
+which corresponds to
+
+\[
+\frac{8}{5} = 1.6 \text{ bits/weight}.
+\]
+
+The key is not expanded into five dense ternary symbols before computation. Instead, the on-chip LUT directly generates:
+
+- the number of nonzero weights;
+- the signs of the nonzero weights;
+- the coordinates of the nonzero weights within the five-weight group.
+
+For example:
 
 ```text
-5 ternary weights
+(0, -1, +1, 0, +1)
         |
         v
-   8-bit key
+     8-bit key
         |
         v
- on-chip LUT decode
+  sparse metadata
         |
-        +--> non-zero count
-        +--> signs
-        +--> coordinates
+        +-- count = 3
+        +-- signs = {-1, +1, +1}
+        +-- coordinates = {1, 2, 4}
 ```
 
-There are only
+The expanded sparse metadata is transient and remains on chip.
 
-\[
-3^5 = 243
-\]
+### Final PE-local architecture
 
-possible five-trit patterns, so all patterns fit in an 8-bit key space.
-
-The accelerator does not fully reconstruct the original five weights before computation. Instead, the LUT directly produces the information needed for zero-skipping: the number of non-zero weights, their signs, and their local coordinates.
-
-### 2.2 PE-owned output groups
-
-The final architecture removes the global partial-product router.
-
-Each PE owns a set of five-output groups and accumulates only into its private partial-sum storage.
+The final organization uses static five-output-group ownership.
 
 ```text
-packed weight stream
+canonical ternary weight matrix
         |
         v
-+-------------------------------+
-|       PE-owned accelerator    |
-|                               |
-| PE0  -> decode -> private psum|
-| PE1  -> decode -> private psum|
-| ...                           |
-| PEn  -> decode -> private psum|
-+-------------------------------+
+group every five output weights
+        |
+        v
+offline PE assignment
+        |
+        v
+8-bit-key packing and physical permutation
+        |
+        v
+DDR4 / 256-bit packed-weight stream
+        |
+        v
+PE-local key FIFO
+        |
+        v
+5-trit sparse-metadata LUT
+        |
+        v
+issue only nonzero products
+        |
+        v
+PE-local partial-sum memory
         |
         v
 physical output order
         |
         v
-offline / host-side permutation
-        |
-        v
-canonical output order
+host-side canonical reorder
 ```
 
-The compute datapath is mapping-agnostic. Logical ownership is encoded by the offline arrangement of packed weights. This allows different static mappings to use the same RTL.
+Each partial-sum location belongs to exactly one PE. Runtime inter-PE destination routing, multi-PE arbitration, and same-address merging are therefore unnecessary.
 
-The reference flow uses PE-owned mapping and supports both `block_cyclic` and `contiguous` case generation.
+## Architecture Evolution
 
----
+The study evaluates three hardware organizations that implement the same fine-grained zero-skipping mechanism.
 
-## 3. Included FPGA Designs
+### 1. Global-router architecture
 
-### 3.1 Proposed zero-skip design
+The initial architecture assigns activations to PEs and dynamically routes asynchronously generated sparse products to shared banked partial-sum memories.
 
-Main properties:
+### 2. Clustered output-partition architecture
 
-- ternary weights in \(\{-1,0,+1\}\);
-- five-trit / 8-bit fixed-length packing;
-- LUT decode into sign/count/coordinate metadata;
-- variable-length emission of only non-zero products;
-- static PE ownership of output groups;
-- private partial-sum accumulation;
-- no global partial-product router;
-- no DSP blocks required for ternary multiplication.
+The PE array is divided into fixed-size clusters. Each cluster owns a distinct output range and contains a bounded local router and local partial-sum banks.
 
-### 3.2 Structurally matched dense baseline
+The evaluated K4/B8 configuration uses:
 
-The dense baseline preserves the PE-owned organization and private accumulation structure, but does not skip zero-valued positions.
+- 4 PEs per cluster;
+- 8 partial-sum banks per cluster.
 
-It is intended to isolate the cost and benefit of the zero-skipping mechanism while keeping the high-level datapath structure matched.
+### 3. Final PE-local architecture
 
----
+Five-output groups are assigned directly to individual PEs. Packed weights are permuted offline so that each PE receives only the keys for its assigned groups. Partial sums are accumulated in private PE-local memories.
 
-## 4. Reference FPGA Platform
+The final organization removes inter-PE sparse-product routing entirely.
 
-The reference FPGA implementation uses:
+## Structurally Matched Dense Baseline
 
-| Item | Reference |
-| --- | --- |
-| Board | Terasic DE25-Standard |
-| FPGA | Altera Agilex 5 A5ED013BB32AE4SR1 |
-| Quartus | Quartus Prime Pro 26.1 |
-| Reference PE count | 128 |
-| Reference weight shape | `[2560, 6912]` |
-| Shape convention | `[out_features, in_features]` |
-| Packed weight interface | 256 bit |
-| Reference top-level clock | 50 MHz |
-| DSP usage | 0 |
+The dense baseline uses the same:
 
-The reference shape corresponds to a representative BitNet `down_proj` linear layer.
+- static output assignment;
+- PE count;
+- activation distribution;
+- packed-weight delivery;
+- PE-local partial-sum memories.
 
-Model weights are **not embedded into the FPGA bitstream** for the implementation-resource evaluation.
+Its functional difference is that all five coordinates represented by a key are processed, including zero-valued positions.
 
----
+This baseline isolates the cost and benefit of fine-grained zero skipping from the independent benefit of PE-local accumulation.
 
-## 5. Reference FPGA Results
+## Paper Results
 
-The checked-in reference results correspond to the PE128 `[2560,6912]` configuration.
+### Representative `2560 x 6912` linear layer
 
-| Metric | Zero-skip PE-owned | Dense PE-owned |
-| --- | ---: | ---: |
-| ALMs | 35,597 | 29,333 |
-| ALM utilization | 76.1% | 62.7% |
-| Registers | 32,250 | 30,762 |
-| Block-memory bits | 217,408 | 217,408 |
-| RAM blocks | 159 / 358 | 159 / 358 |
-| DSP blocks | 0 | 0 |
-| Fmax | 107.16 MHz | 98.67 MHz |
-| Setup slack | +10.668 ns | +9.865 ns |
+| PE count | Dense layer cycles | Zero-skip layer cycles | Speedup | Dense ALMs | Zero-skip ALMs | ALM overhead | Layer-energy reduction |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 32 | 555,613 | 343,571 | 1.617x | 9,345 | 10,551 | 12.9% | 38.1% |
+| 64 | 279,094 | 174,700 | 1.598x | 16,618 | 19,079 | 14.8% | 37.1% |
+| 128 | 140,836 | 113,189 | 1.244x | 29,333 | 35,597 | 21.4% | 19.2% |
 
-Machine-readable reference values are stored under:
+Post-fit Fmax values:
+
+| PE count | Dense Fmax | Zero-skip Fmax |
+| ---: | ---: | ---: |
+| 32 | 156.81 MHz | 146.16 MHz |
+| 64 | 133.39 MHz | 135.03 MHz |
+| 128 | 98.67 MHz | 107.16 MHz |
+
+### PE128 model-wide evaluation
+
+The PE128 RTL was evaluated on all 210 BitNet b1.58 2B4T linear-weight tensors.
+
+| Metric | Result |
+| --- | ---: |
+| Evaluated tensors | 210 |
+| RTL outputs matching software reference | 210 / 210 |
+| Weight-stream bound | 205 / 210 (97.6%) |
+| Compute bound | 5 / 210 (2.4%) |
+| Mean lower-bound efficiency | 99.959% |
+| Median lower-bound efficiency | 99.978% |
+| Worst lower-bound efficiency | 99.748% |
+| Mean PE utilization | 71.65% |
+| Mean PE workload max/mean | 1.142 |
+| Worst PE workload max/mean | 1.569 |
+
+At PE128, the 256-bit/cycle packed-weight stream is the dominant performance limit for most tensors.
+
+## Target Workload
+
+The evaluation uses the ternary linear weights of **BitNet b1.58 2B4T**.
+
+The model contains 30 transformer layers and seven evaluated linear projections per layer:
+
+- `q_proj`
+- `k_proj`
+- `v_proj`
+- `o_proj`
+- `gate_proj`
+- `up_proj`
+- `down_proj`
+
+This gives 210 linear-weight tensors.
+
+The logical weight shapes are:
 
 ```text
-results/reference/
+[out_features, in_features]
+
+[640,  2560]
+[2560, 2560]
+[6912, 2560]
+[2560, 6912]
 ```
 
----
+## FPGA Platform
 
-## 6. Repository Layout
+| Item | Configuration |
+| --- | --- |
+| Board | Terasic DE25-Standard |
+| FPGA | Altera Agilex 5 E-Series A5ED013BB32AE4SR1 |
+| Quartus | Quartus Prime Pro 26.1 |
+| Packed-weight interface | 256 bit/cycle |
+| Evaluation clock | 50 MHz |
+| DSP blocks for ternary products | 0 |
+
+## Repository Layout
 
 ```text
 configs/
-    Fixed reference FPGA configuration.
+    Fixed FPGA reference configurations.
 
 constraints/
-    Timing and DE25 board constraints.
+    Timing and board pin constraints.
 
 ip/
     Quartus IP parameterization sources.
-    Generated IP products are intentionally not tracked.
 
 rtl/core/
-    Final PE-owned zero-skip accelerator.
+    Final PE-local zero-skip accelerator.
 
 rtl/baseline/
     Structurally matched dense PE-owned baseline.
 
 rtl/lut/
-    Five-trit decode logic.
+    Five-trit sparse-metadata decode logic.
 
 rtl/memory/
-    FIFOs, activation storage, weight streaming, and support memories.
+    Activation, weight-streaming, FIFO, and partial-sum support logic.
 
 top/
-    FPGA top-level wrappers.
+    FPGA top-level modules.
 
 scripts/quartus/
-    Clean Quartus project-generation and compilation scripts.
+    Reproducible Quartus project creation and compilation.
 
 sim/filelists/
-    VCS file lists.
+    Synopsys VCS file lists.
 
 sim/tb/
     VCS testbenches.
 
 sim/reference_cases/
-    Small synthetic regression case tracked by Git.
+    Small self-contained regression cases.
 
 sim/prepared_cases/
-    Generated model/test cases. Not tracked by Git.
+    Generated model-layer cases. Excluded from Git.
 
 tools/model/
-    BitNet / generic ternary model preparation.
+    BitNet and generic ternary-weight preparation.
 
 tools/vcs/
-    PE-owned case generation and output verification.
+    PE-owned mapping, packing, and output verification.
 
 results/reference/
-    Reference FPGA implementation results.
+    Reference implementation results.
 ```
 
----
+## Requirements
 
-## 7. Requirements
+### Quartus FPGA build
 
-### FPGA synthesis
+- Quartus Prime Pro 26.1
+- Agilex 5 device support
+- Bash
 
-Required:
+### VCS simulation
 
-- Quartus Prime Pro 26.1;
-- Agilex 5 device support;
-- Bash.
+- Synopsys VCS
+- Bash
 
-Python and Synopsys VCS are not required if the goal is only to synthesize a user-specified layer shape.
+### Model preparation and result verification
 
-### Functional simulation
+- Python 3.8 or later
+- NumPy
+- `safetensors` for official BitNet packed checkpoints
 
-Required:
+## Quartus Build
 
-- Synopsys VCS;
-- Bash.
-
-For host-side result verification and model-case generation:
-
-- Python 3.8 or later;
-- NumPy.
-
-For official BitNet packed checkpoints:
-
-- `safetensors`.
-
----
-
-# 8. Quartus FPGA Build
-
-All Quartus-generated products are written under:
+All generated Quartus files are written under:
 
 ```text
 build/quartus/
 ```
 
-The build tree is disposable and excluded from Git.
+The directory is excluded from Git.
 
-Set the Quartus installation path if the executables are not already in `PATH`:
+If the Quartus executables are not already in `PATH`, set:
 
 ```bash
 export QUARTUS_ROOTDIR=/path/to/quartus
 ```
 
-For the reference development environment this pointed to Quartus Prime Pro 26.1, but no absolute installation path is hard-coded in the repository.
-
----
-
-## 8.1 Reproduce the reference zero-skip build
+### Reference zero-skip build
 
 ```bash
 ./scripts/quartus/build_zeroskip.sh
 ```
 
-With no shape or configuration argument, the script uses the fixed PE128 reference configuration:
+The no-argument build uses the fixed PE128 reference configuration for:
 
 ```text
 weight.shape = [2560, 6912]
-PE = 128
 ```
 
-The generated SOF is:
+Generated SOF:
 
 ```text
 build/quartus/zeroskip/output_files/zeroskip_top.sof
 ```
 
----
-
-## 8.2 Reproduce the reference dense build
+### Reference dense build
 
 ```bash
 ./scripts/quartus/build_dense.sh
 ```
 
-The generated SOF is:
+Generated SOF:
 
 ```text
 build/quartus/dense/output_files/zeroskip_top.sof
 ```
 
----
+## Build a User-Specified Linear-Layer Shape
 
-# 9. Build a User-Specified Linear-Layer Shape
+The Quartus build can generate a design for a user-specified linear-layer shape without requiring model weights.
 
-The FPGA design can be compiled for a different linear-layer shape without requiring model weights or Python.
-
-The dimension convention follows the usual PyTorch linear-weight layout:
+The shape convention is:
 
 ```text
 weight.shape = [out_features, in_features]
 ```
 
-For example, a `[640,2560]` layer can be synthesized as:
+Example:
 
 ```bash
 ./scripts/quartus/build_zeroskip.sh \
@@ -328,7 +342,7 @@ For example, a `[640,2560]` layer can be synthesized as:
   --in-features 2560
 ```
 
-The matched dense design uses the same interface:
+The dense baseline uses the same interface:
 
 ```bash
 ./scripts/quartus/build_dense.sh \
@@ -336,7 +350,7 @@ The matched dense design uses the same interface:
   --in-features 2560
 ```
 
-PE128 is the default. Supported build-time PE counts are:
+PE128 is the default. Supported PE counts are:
 
 ```text
 32
@@ -344,7 +358,7 @@ PE128 is the default. Supported build-time PE counts are:
 128
 ```
 
-For example:
+Example:
 
 ```bash
 ./scripts/quartus/build_zeroskip.sh \
@@ -353,38 +367,25 @@ For example:
   --num-pe 64
 ```
 
-The build script derives:
+For output dimension \(N_{\mathrm{out}}\), the number of five-output groups is
 
 \[
-G =
-\left\lceil
-\frac{N_{\mathrm{out}}}{5}
-\right\rceil
+G = \left\lceil \frac{N_{\mathrm{out}}}{5} \right\rceil.
 \]
 
-five-trit groups per input,
+With a 256-bit word containing 32 keys, the number of weight words per input is
 
 \[
-W_{\mathrm{input}}
-=
-\left\lceil
-\frac{G}{32}
-\right\rceil
+W = \left\lceil \frac{G}{32} \right\rceil.
 \]
 
-256-bit weight words per input, and
+For input dimension \(N_{\mathrm{in}}\), the total number of packed weight words is
 
 \[
-W_{\mathrm{total}}
-=
-N_{\mathrm{in}} W_{\mathrm{input}}
+N_{\mathrm{weight}} = N_{\mathrm{in}} W.
 \]
 
-total packed weight words.
-
-The accumulator width is also derived from the selected input dimension.
-
-Examples for BitNet linear-layer shapes:
+Representative values:
 
 | Weight shape `[out,in]` | Groups/input | 256-bit words/input | Total weight words |
 | --- | ---: | ---: | ---: |
@@ -393,49 +394,36 @@ Examples for BitNet linear-layer shapes:
 | `[6912,2560]` | 1,383 | 44 | 112,640 |
 | `[2560,6912]` | 512 | 16 | 110,592 |
 
-When `out_features` is not divisible by five, the final five-trit group is zero-padded.
+If `out_features` is not divisible by five, the final group is zero-padded.
 
----
+## Build from a Prepared Case
 
-# 10. Build from an Existing Case Configuration
-
-A case generated by the model/VCS preparation flow contains:
+A generated model-layer case contains:
 
 ```text
 zeroskip_active_case.svh
 ```
 
-The exact same compile-time configuration can be passed to Quartus:
+The same compile-time configuration can be passed directly to Quartus:
 
 ```bash
 ./scripts/quartus/build_zeroskip.sh \
   --config sim/prepared_cases/<case-id>/zeroskip_active_case.svh
 ```
 
-This is useful when the same layer configuration has already been verified in VCS.
+This allows a VCS-verified layer configuration to be synthesized without changing the RTL.
 
----
+## VCS Functional Regression
 
-# 11. VCS Functional Simulation
-
-A small synthetic reference case is tracked in Git so that the final PE-owned RTL can be checked without downloading BitNet.
-
-Reference case:
+A self-contained synthetic regression case is included:
 
 ```text
 sim/reference_cases/corner128x128_contiguous_pe32
 ```
 
-The case uses:
+The test uses signed 8-bit activations and ternary weights with all-zero, all-`+1`, all-`-1`, and alternating patterns.
 
-- 128 valid input elements;
-- 128 valid output elements with padded physical output slots;
-- input values `0,1,...,127`;
-- ternary weights in \(\{-1,0,+1\}\);
-- simple all-zero, all-+1, all--1, and alternating patterns;
-- contiguous offline ownership.
-
-Run the proposed zero-skip design:
+Run the final zero-skip RTL:
 
 ```bash
 ./sim/scripts/run_pe_owned_case_vcs.sh \
@@ -448,15 +436,9 @@ A successful run reports:
 mismatches=0
 ```
 
-The testbench also dumps the physical output-bank contents in decimal form for manual inspection.
+### Canonical output verification
 
----
-
-## 11.1 Canonical output verification
-
-PE-owned execution emits results in physical ownership order.
-
-Reorder the output to canonical logical-output order and compare it with the software reference:
+PE-owned execution emits results in physical ownership order. Reorder them to canonical logical-output order and compare against the software reference:
 
 ```bash
 python3 \
@@ -464,35 +446,26 @@ python3 \
   sim/reference_cases/corner128x128_contiguous_pe32
 ```
 
-Expected:
+Expected result:
 
 ```text
 PASS: canonical reorder matches software reference
 ```
 
----
-
-## 11.2 Dense baseline simulation
+### Dense baseline regression
 
 ```bash
 ./sim/scripts/run_dense_owned_case_vcs.sh \
   sim/reference_cases/corner128x128_contiguous_pe32
 ```
 
-A successful simulation prints a `PASS dense-owned` message after checking the generated outputs.
+A successful simulation reports `PASS dense-owned`.
 
----
+## Prepare an Official BitNet Layer
 
-# 12. Prepare an Official BitNet Layer
+The model-preparation flow separates canonical ternary-weight extraction from the hardware-specific PE-owned layout.
 
-The model-preparation flow separates:
-
-1. canonical ternary-weight extraction; and
-2. hardware-specific PE-owned weight permutation.
-
-This prevents model decoding logic from being coupled to the final hardware mapping.
-
-List supported linear tensors in an official packed BitNet checkpoint:
+List supported tensors in an official packed BitNet checkpoint:
 
 ```bash
 python3 \
@@ -501,7 +474,7 @@ python3 \
   --list
 ```
 
-Example: prepare layer 0 `k_proj` for PE128:
+Example for layer 0 `k_proj`:
 
 ```bash
 python3 \
@@ -515,7 +488,7 @@ python3 \
   --activation-mode ramp
 ```
 
-The generated hardware case is placed under:
+Generated case:
 
 ```text
 sim/prepared_cases/bitnet_l00_k_proj_pe128/
@@ -535,14 +508,14 @@ zeroskip_active_case.svh
 case_metadata.json
 ```
 
-Run it with:
+Run VCS:
 
 ```bash
 ./sim/scripts/run_pe_owned_case_vcs.sh \
   sim/prepared_cases/bitnet_l00_k_proj_pe128
 ```
 
-Then verify canonical output order:
+Verify canonical output order:
 
 ```bash
 python3 \
@@ -550,17 +523,13 @@ python3 \
   sim/prepared_cases/bitnet_l00_k_proj_pe128
 ```
 
-The official packed2 decoding path performs a packed-weight round-trip check before generating the hardware case.
+The BitNet packed-weight path performs a packed2 round-trip check before generating the hardware case.
 
 Model checkpoints are not included in this repository.
 
----
+## Use an Arbitrary Ternary Weight Matrix
 
-# 13. Use an Arbitrary Ternary Weight Matrix
-
-A user-provided NumPy matrix can also be used.
-
-Requirements:
+A NumPy matrix can be used directly if it satisfies:
 
 ```text
 shape  = [out_features, in_features]
@@ -580,144 +549,150 @@ python3 \
   --activation-mode ramp
 ```
 
-The public preparation flow intentionally rejects non-ternary matrices rather than silently quantizing floating-point weights.
+Non-ternary matrices are rejected rather than silently quantized.
 
----
+## Output-Group Mapping
 
-# 14. Weight Mapping
+Let
 
-The final PE-owned compute core does not need to know the logical output mapping.
+\[
+G = \left\lceil \frac{N_{\mathrm{out}}}{5} \right\rceil
+\]
 
-The mapping is encoded offline by permuting packed keys into PE lanes.
+be the number of five-output groups and \(P\) the PE count.
 
-Supported preparation modes include:
+The default mapping evaluated in the paper is block-cyclic:
+
+\[
+p = g \bmod P,
+\]
+
+where \(g\) is the global five-output-group index.
+
+For local group index \(q\),
+
+\[
+g = Pq + p.
+\]
+
+For intra-group coordinate \(r \in \{0,1,2,3,4\}\), the global output is
+
+\[
+o = 5(Pq+p)+r.
+\]
+
+The hardware datapath does not depend on the logical output mapping. Different mappings require only a different offline packed-weight permutation and inverse output permutation.
+
+The preparation tools support:
 
 ```text
 block_cyclic
 contiguous
 ```
 
-The generated file
+The inverse mapping is stored in:
 
 ```text
 output_physical_to_global.csv
 ```
 
-records the inverse mapping needed to recover canonical logical-output order.
+Across the 210 evaluated BitNet tensors, block-cyclic assignment provides better average PE workload balance than contiguous assignment.
 
-The same RTL can therefore execute differently mapped cases without changing the compute datapath.
+## Performance Limits
 
-For the reference BitNet PE128 evaluation, block-cyclic ownership is the default/recommended mapping because it avoids severe load imbalance in some layers.
+For the implemented 256-bit/cycle packed-weight interface, one word carries 32 five-trit keys and therefore represents 160 ternary positions.
 
----
+For zero ratio \(z\), the approximate rate of useful nonzero work supplied by a \(B\)-bit/cycle packed stream is
 
-# 15. Generated Files and Git Policy
+\[
+R_{\mathrm{weight,nz}}
+\approx
+\frac{5B}{8}(1-z).
+\]
 
-The following are intentionally excluded from Git:
+The PE array can issue at most \(P\) nonzero products per cycle. At PE128, useful nonzero-work delivery from the 256-bit/cycle interface becomes the dominant limitation for most BitNet tensors.
+
+For exact analysis under the implemented interface:
+
+\[
+C_{\mathrm{weight}}
+=
+N_{\mathrm{in}}
+\left\lceil
+\frac{\left\lceil N_{\mathrm{out}}/5 \right\rceil}{32}
+\right\rceil,
+\]
+
+\[
+C_{\mathrm{compute}}
+=
+\max_p N_{\mathrm{nz},p},
+\]
+
+and
+
+\[
+C_{\mathrm{LB}}
+=
+\max(C_{\mathrm{weight}}, C_{\mathrm{compute}}).
+\]
+
+## FPGA Implementation and Validation
+
+RTL was synthesized, placed, and routed with Quartus Prime Pro 26.1 for the Agilex 5 E-Series A5ED013BB32AE4SR1 device.
+
+The final bitstream was programmed onto the target FPGA board and on-board accelerator operation was confirmed in the associated study.
+
+Unless otherwise stated, cycle and energy evaluations use a 50 MHz operating clock. Fmax values are taken from timing analysis.
+
+Logic resources are reported as Adaptive Logic Modules (ALMs), memories as M20K blocks, and ternary products require no DSP multiplier blocks.
+
+## Power and Energy
+
+Post-fit activity was analyzed with Quartus Power Analyzer.
+
+For power \(P_{\mathrm{pow}}\), clock frequency \(f\), and measured layer cycles \(C_{\mathrm{layer}}\),
+
+\[
+E_{\mathrm{layer}}
+=
+P_{\mathrm{pow}}
+\frac{C_{\mathrm{layer}}}{f}.
+\]
+
+Quartus reported `Power Estimation Confidence = Low` because simulation-derived activity did not cover the complete fitted design. Absolute power values are therefore post-fit estimates.
+
+Matched dense and zero-skip energy comparisons use the same device, workload, clock frequency, and power-analysis procedure.
+
+## Generated Files and Git Policy
+
+The following generated or external artifacts are excluded from Git:
 
 - Quartus build databases;
-- Quartus generated IP products;
+- generated Quartus IP products;
 - SOF files;
 - VCS executables and build directories;
 - waveform files;
-- generated model cases;
+- generated model-layer cases;
 - downloaded model checkpoints;
 - local power-analysis artifacts.
 
-The repository retains only the source files, parameterization files, small regression data, and reference result summaries required for reproduction.
+The repository retains source RTL, parameterization files, build scripts, testbenches, small regression data, model-preparation utilities, and reference result summaries.
 
----
+## Data Availability
 
-# 16. FPGA Board Execution
+The primary evaluation data consist of derived cycle reports, FPGA implementation reports, power reports, and summary tables generated from the publicly available BitNet b1.58 2B4T model weights.
 
-The repository contains the RTL infrastructure required for DDR4/JTAG integration, but the complete end-to-end board execution procedure is not yet part of the validated release flow.
+## Citation
 
-Planned validated flow:
-
-```text
-generate model case
-      |
-      v
-build case-specific SOF
-      |
-      v
-program FPGA
-      |
-      v
-load packed weights to DDR4
-      |
-      v
-load activations
-      |
-      v
-start accelerator
-      |
-      v
-read physical outputs
-      |
-      v
-canonical reorder
-      |
-      v
-compare with software reference
+```bibtex
+@article{inoue2026ternaryzeroskip,
+  author = {Yu Inoue and Takao Marukame and Tetsuya Asai and Kota Ando},
+  title  = {Fine-Grained Zero Skipping for Ternary LLM Linear Layers with Packed Sparse Metadata},
+  year   = {2026}
+}
 ```
 
-This section will be updated after FPGA board validation.
+## License
 
----
-
-# 17. Power Evaluation
-
-Power-analysis artifacts used during development are not part of the minimal functional reproduction flow.
-
-Reported FPGA power values were obtained with Quartus Power Analyzer. Power-estimation confidence and activity-source conditions must be considered when interpreting absolute values.
-
-The public release will document the retained power-reproduction procedure separately if those artifacts are included.
-
----
-
-# 18. Reproducibility Scope
-
-The repository is intended to distinguish three levels of reproduction:
-
-### Level 1 — Functional RTL regression
-
-Does not require BitNet.
-
-```text
-synthetic case -> VCS -> bit-exact output verification
-```
-
-### Level 2 — Model-layer functional reproduction
-
-Requires an external BitNet checkpoint or user-provided ternary weights.
-
-```text
-model weight -> packing/mapping -> VCS -> software comparison
-```
-
-### Level 3 — FPGA implementation reproduction
-
-Does not require model weights for resource/timing reproduction.
-
-```text
-shape/config -> Quartus -> post-fit resources/Fmax -> SOF
-```
-
-Board-level execution will be added after validation.
-
----
-
-# 19. Citation
-
-Citation information will be added after the associated paper is finalized.
-
----
-
-# 20. License
-
-A software license has not yet been finalized.
-
-Until a license is added, do not assume that redistribution, modification, or reuse is permitted solely because the source repository is accessible.
-
-The license will be selected after the applicable university/laboratory intellectual-property requirements are confirmed.
+Licensed under the [Apache License 2.0](LICENSE).
