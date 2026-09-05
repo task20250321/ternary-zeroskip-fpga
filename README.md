@@ -614,18 +614,18 @@ The PE array can issue at most $P$ nonzero products per cycle. At PE128, useful 
 
 For exact analysis under the implemented interface:
 
-$$
+$$`
 C_{\mathrm{weight}}
-\equal
+=
 N_{\mathrm{in}}
 \left\lceil
 \frac{\left\lceil N_{\mathrm{out}}/5 \right\rceil}{32}
 \right\rceil,
-$$
+`$$
 
 $$
 C_{\mathrm{compute}}
-\equal
+=
 \max_p N_{\mathrm{nz},p},
 $$
 
@@ -633,7 +633,7 @@ and
 
 $$
 C_{\mathrm{LB}}
-\equal
+=
 \max(C_{\mathrm{weight}}, C_{\mathrm{compute}}).
 $$
 
