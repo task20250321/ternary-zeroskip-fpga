@@ -623,16 +623,14 @@ N_{\mathrm{in}}
 $$
 
 $$
-C_{\mathrm{compute}}
-=
+C_{\mathrm{compute}} =
 \max_p N_{\mathrm{nz},p},
 $$
 
 and
 
 $$
-C_{\mathrm{LB}}
-=
+C_{\mathrm{LB}} =
 \max(C_{\mathrm{weight}}, C_{\mathrm{compute}}).
 $$
 
@@ -653,8 +651,7 @@ Post-fit activity was analyzed with Quartus Power Analyzer.
 For power $P_{\mathrm{pow}}$, clock frequency $f$, and measured layer cycles $C_{\mathrm{layer}}$,
 
 $$
-E_{\mathrm{layer}}
-=
+E_{\mathrm{layer}} =
 P_{\mathrm{pow}}
 \frac{C_{\mathrm{layer}}}{f}.
 $$
