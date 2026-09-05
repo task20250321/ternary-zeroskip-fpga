@@ -1,5 +1,8 @@
 `timescale 1ns/1ps
 
+// Copyright 2026 Yu Inoue
+// SPDX-License-Identifier: Apache-2.0
+
 module accelerator_host_case_ctrl #(
     parameter integer TOTAL_WEIGHT_WORDS = 10240,
     parameter logic [29:0] WEIGHT_DDR_BASE = 30'h00100000,

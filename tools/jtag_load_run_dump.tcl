@@ -1,3 +1,5 @@
+# Copyright 2026 Yu Inoue
+# SPDX-License-Identifier: Apache-2.0
 # Run with:
 # system-console --cli --project_dir=. --script=tools/jtag_load_run_dump.tcl
 #

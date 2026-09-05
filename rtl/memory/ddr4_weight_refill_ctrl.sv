@@ -1,5 +1,8 @@
 `timescale 1ns/1ps
 
+// Copyright 2026 Yu Inoue
+// SPDX-License-Identifier: Apache-2.0
+
 // Read-only AXI4 refill controller for packed ternary-weight words.
 //
 // Properties:

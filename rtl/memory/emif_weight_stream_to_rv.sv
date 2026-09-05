@@ -1,5 +1,8 @@
 `timescale 1ns/1ps
 
+// Copyright 2026 Yu Inoue
+// SPDX-License-Identifier: Apache-2.0
+
 // Adapter for the existing request/response EMIF weight streamer.
 // It converts weight_available/weight_req/weight_valid into a ready/valid stream.
 module emif_weight_stream_to_rv #(

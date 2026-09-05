@@ -1,3 +1,6 @@
+// Copyright 2026 Yu Inoue
+// SPDX-License-Identifier: Apache-2.0
+
 localparam integer NUM_PE             = `ZS_NUM_PE;
 localparam integer NUM_BANKS          = `ZS_NUM_BANKS;
 localparam integer IN_FEATURES        = `ZS_IN_FEATURES;

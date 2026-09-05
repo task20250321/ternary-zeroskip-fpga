@@ -1,5 +1,8 @@
 `timescale 1ns/1ps
 
+// Copyright 2026 Yu Inoue
+// SPDX-License-Identifier: Apache-2.0
+
 module ternary_dense_owned_emif_wrapper #(
     parameter integer NUM_PE                  = 32,
     parameter integer IN_FEATURES             = 6912,

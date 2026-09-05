@@ -1,5 +1,8 @@
 `timescale 1ns/1ps
 
+// Copyright 2026 Yu Inoue
+// SPDX-License-Identifier: Apache-2.0
+
 // PE-level output ownership Zero-skip accelerator.
 //
 // PE p permanently owns global 5-trit groups g where g mod NUM_PE == p.

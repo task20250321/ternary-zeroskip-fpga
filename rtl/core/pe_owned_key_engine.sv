@@ -1,5 +1,8 @@
 `timescale 1ns/1ps
 
+// Copyright 2026 Yu Inoue
+// SPDX-License-Identifier: Apache-2.0
+
 // One PE owns every NUM_PE-th five-trit output group.
 //
 // Source FIFO entry = {activation, local_group, 8-bit key}.

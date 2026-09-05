@@ -1,5 +1,8 @@
 `timescale 1ns/1ps
 
+// Copyright 2026 Yu Inoue
+// SPDX-License-Identifier: Apache-2.0
+
 // One independent pending_sum_bank per PE.  There is no arbitration network:
 // PE p writes only private bank p.
 module pe_owned_private_accumulator #(

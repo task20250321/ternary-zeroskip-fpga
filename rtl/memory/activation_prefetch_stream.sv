@@ -1,5 +1,8 @@
 `timescale 1ns/1ps
 
+// Copyright 2026 Yu Inoue
+// SPDX-License-Identifier: Apache-2.0
+
 module activation_prefetch_stream #(
     parameter integer IN_FEATURES = 2560,
     parameter integer ACT_WIDTH   = 8,

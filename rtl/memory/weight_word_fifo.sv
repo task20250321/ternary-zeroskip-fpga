@@ -1,5 +1,8 @@
 `timescale 1ns/1ps
 
+// Copyright 2026 Yu Inoue
+// SPDX-License-Identifier: Apache-2.0
+
 // 256-bit weight-word FIFO for the current shared-partial-sum accelerator.
 //
 // The read side uses a request/response contract:

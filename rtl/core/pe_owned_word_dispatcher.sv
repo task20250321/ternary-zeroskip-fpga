@@ -1,5 +1,8 @@
 `timescale 1ns/1ps
 
+// Copyright 2026 Yu Inoue
+// SPDX-License-Identifier: Apache-2.0
+
 // Scalable PE-owned weight dispatcher for NUM_PE = 32, 64, or 128.
 //
 // A 256-bit DDR word always carries 32 independent 8-bit trit keys.

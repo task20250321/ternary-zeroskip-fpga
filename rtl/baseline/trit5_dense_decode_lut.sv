@@ -1,5 +1,8 @@
 `timescale 1ns/1ps
 
+// Copyright 2026 Yu Inoue
+// SPDX-License-Identifier: Apache-2.0
+
 // Dense/no-skip decoder for the same 5-trit -> 8-bit low_switch_sparse key map.
 // Unlike the proposal decoder, coordinates/count are unnecessary because
 // dense lockstep visits positions 0,1,2,3,4 deterministically.

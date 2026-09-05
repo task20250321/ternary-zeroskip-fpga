@@ -1,5 +1,8 @@
 `timescale 1ns/1ps
 
+// Copyright 2026 Yu Inoue
+// SPDX-License-Identifier: Apache-2.0
+
 // DDR4 packed-weight streamer for the current shared-partial-sum accelerator.
 //
 // This module is intentionally independent of the partial-sum architecture.

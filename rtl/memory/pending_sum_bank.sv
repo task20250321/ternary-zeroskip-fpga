@@ -1,5 +1,8 @@
 `timescale 1ns/1ps
 
+// Copyright 2026 Yu Inoue
+// SPDX-License-Identifier: Apache-2.0
+
 // Pending-sum bank backed by a synchronous M20K RAM.
 //
 // - pending_mem is a synchronous simple-dual-port M20K.

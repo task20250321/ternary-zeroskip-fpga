@@ -1,5 +1,8 @@
 `timescale 1ns/1ps
 
+// Copyright 2026 Yu Inoue
+// SPDX-License-Identifier: Apache-2.0
+
 // One independent pending_sum_bank per Dense-owned PE.
 // No adder tree, no cross-PE arbitration, no shared-psum write contention.
 module dense_owned_private_accumulator #(

@@ -1,3 +1,6 @@
+# Copyright 2026 Yu Inoue
+# SPDX-License-Identifier: Apache-2.0
+
 package require ::quartus::project
 
 # ============================================================

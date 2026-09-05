@@ -1,5 +1,8 @@
 `timescale 1ns/1ps
 
+// Copyright 2026 Yu Inoue
+// SPDX-License-Identifier: Apache-2.0
+
 // Dense/no-skip PE engine with fixed output ownership.
 // Every valid trit key consumes all five coordinates, including zero weights.
 // This keeps dense semantics while removing the cross-PE reduction tree.

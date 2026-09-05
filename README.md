@@ -15,21 +15,21 @@ The final FPGA architecture statically assigns five-output groups to processing 
 
 Five ternary weights have 243 possible patterns:
 
-\[
+$$
 3^5 = 243.
-\]
+$$
 
 An 8-bit key is therefore the minimum lossless fixed-length representation because
 
-\[
+$$
 2^7 < 3^5 \leq 2^8,
-\]
+$$
 
 which corresponds to
 
-\[
+$$
 \frac{8}{5} = 1.6 \text{ bits/weight}.
-\]
+$$
 
 The key is not expanded into five dense ternary symbols before computation. Instead, the on-chip LUT directly generates:
 
@@ -367,23 +367,23 @@ Example:
   --num-pe 64
 ```
 
-For output dimension \(N_{\mathrm{out}}\), the number of five-output groups is
+For output dimension $N_{\mathrm{out}}$, the number of five-output groups is
 
-\[
+$$
 G = \left\lceil \frac{N_{\mathrm{out}}}{5} \right\rceil.
-\]
+$$
 
 With a 256-bit word containing 32 keys, the number of weight words per input is
 
-\[
+$$
 W = \left\lceil \frac{G}{32} \right\rceil.
-\]
+$$
 
-For input dimension \(N_{\mathrm{in}}\), the total number of packed weight words is
+For input dimension $N_{\mathrm{in}}$, the total number of packed weight words is
 
-\[
+$$
 N_{\mathrm{weight}} = N_{\mathrm{in}} W.
-\]
+$$
 
 Representative values:
 
@@ -555,31 +555,31 @@ Non-ternary matrices are rejected rather than silently quantized.
 
 Let
 
-\[
+$$
 G = \left\lceil \frac{N_{\mathrm{out}}}{5} \right\rceil
-\]
+$$
 
-be the number of five-output groups and \(P\) the PE count.
+be the number of five-output groups and $P$ the PE count.
 
 The default mapping evaluated in the paper is block-cyclic:
 
-\[
+$$
 p = g \bmod P,
-\]
+$$
 
-where \(g\) is the global five-output-group index.
+where $g$ is the global five-output-group index.
 
-For local group index \(q\),
+For local group index $q$,
 
-\[
+$$
 g = Pq + p.
-\]
+$$
 
-For intra-group coordinate \(r \in \{0,1,2,3,4\}\), the global output is
+For intra-group coordinate $r \in \{0,1,2,3,4\}$, the global output is
 
-\[
+$$
 o = 5(Pq+p)+r.
-\]
+$$
 
 The hardware datapath does not depend on the logical output mapping. Different mappings require only a different offline packed-weight permutation and inverse output permutation.
 
@@ -602,40 +602,40 @@ Across the 210 evaluated BitNet tensors, block-cyclic assignment provides better
 
 For the implemented 256-bit/cycle packed-weight interface, one word carries 32 five-trit keys and therefore represents 160 ternary positions.
 
-For zero ratio \(z\), the approximate rate of useful nonzero work supplied by a \(B\)-bit/cycle packed stream is
+For zero ratio $z$, the approximate rate of useful nonzero work supplied by a $B$-bit/cycle packed stream is
 
-\[
+$$
 R_{\mathrm{weight,nz}}
 \approx
 \frac{5B}{8}(1-z).
-\]
+$$
 
-The PE array can issue at most \(P\) nonzero products per cycle. At PE128, useful nonzero-work delivery from the 256-bit/cycle interface becomes the dominant limitation for most BitNet tensors.
+The PE array can issue at most $P$ nonzero products per cycle. At PE128, useful nonzero-work delivery from the 256-bit/cycle interface becomes the dominant limitation for most BitNet tensors.
 
 For exact analysis under the implemented interface:
 
-\[
+$$
 C_{\mathrm{weight}}
 =
 N_{\mathrm{in}}
 \left\lceil
 \frac{\left\lceil N_{\mathrm{out}}/5 \right\rceil}{32}
 \right\rceil,
-\]
+$$
 
-\[
+$$
 C_{\mathrm{compute}}
 =
 \max_p N_{\mathrm{nz},p},
-\]
+$$
 
 and
 
-\[
+$$
 C_{\mathrm{LB}}
 =
 \max(C_{\mathrm{weight}}, C_{\mathrm{compute}}).
-\]
+$$
 
 ## FPGA Implementation and Validation
 
@@ -651,14 +651,14 @@ Logic resources are reported as Adaptive Logic Modules (ALMs), memories as M20K 
 
 Post-fit activity was analyzed with Quartus Power Analyzer.
 
-For power \(P_{\mathrm{pow}}\), clock frequency \(f\), and measured layer cycles \(C_{\mathrm{layer}}\),
+For power $P_{\mathrm{pow}}$, clock frequency $f$, and measured layer cycles $C_{\mathrm{layer}}$,
 
-\[
+$$
 E_{\mathrm{layer}}
 =
 P_{\mathrm{pow}}
 \frac{C_{\mathrm{layer}}}{f}.
-\]
+$$
 
 Quartus reported `Power Estimation Confidence = Low` because simulation-derived activity did not cover the complete fitted design. Absolute power values are therefore post-fit estimates.
 

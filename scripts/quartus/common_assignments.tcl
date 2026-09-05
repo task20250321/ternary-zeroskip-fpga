@@ -1,3 +1,5 @@
+# Copyright 2026 Yu Inoue
+# SPDX-License-Identifier: Apache-2.0
 # Generated from the validated Quartus project.
 # RTL/IP assignments are intentionally excluded.
 
