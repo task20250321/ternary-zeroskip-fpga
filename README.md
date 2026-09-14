@@ -1,3 +1,12 @@
+## Publication status
+
+This repository accompanies the manuscript:
+
+**"Fine-Grained Zero Skipping for Ternary LLM Linear Layers with Packed Sparse Metadata"**
+
+submitted to *npj Unconventional Computing* for consideration for presentation at the
+11th International Conference on Rebooting Computing (ICRC 2026).
+
 # Fine-Grained Zero Skipping for Ternary LLM Linear Layers with Packed Sparse Metadata
 
 FPGA RTL and reproducibility utilities for the architecture described in:
